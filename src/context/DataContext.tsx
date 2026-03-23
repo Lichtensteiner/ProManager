@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { Project, Client, Lot, Task, Alert, User, AlertColor, Invoice, Installment, Quote, ProfessionalInvoice, LineItem, Payment, CompanyInfo, ProfessionalInvoiceStatus } from '../types';
+import { 
+  Project, Client, Lot, Task, Alert, User, AlertColor, Invoice, Installment, 
+  Quote, ProfessionalInvoice, LineItem, Payment, CompanyInfo, ProfessionalInvoiceStatus,
+  StockItem, StockMovement, Supplier, Expense, AppWorker, Attendance, AppDocument
+} from '../types';
 import { addDays, differenceInDays, format } from 'date-fns';
 import { supabase } from '../lib/supabase';
 
@@ -15,6 +19,13 @@ interface DataContextType {
   quotes: Quote[];
   professionalInvoices: ProfessionalInvoice[];
   payments: Payment[];
+  stockItems: StockItem[];
+  stockMovements: StockMovement[];
+  suppliers: Supplier[];
+  expenses: Expense[];
+  workers: AppWorker[];
+  attendances: Attendance[];
+  documents: AppDocument[];
   companyInfo: CompanyInfo;
   dbError: string | null;
   isLoading: boolean;
@@ -42,6 +53,19 @@ interface DataContextType {
   updateProfessionalInvoice: (id: string, i: Partial<ProfessionalInvoice>, items?: LineItem[]) => Promise<void>;
   deleteProfessionalInvoice: (id: string) => Promise<void>;
   addPayment: (p: Omit<Payment, 'id'>) => Promise<void>;
+  // New Management
+  addStockItem: (item: Omit<StockItem, 'id' | 'lastUpdated'>) => Promise<void>;
+  updateStockItem: (id: string, item: Partial<StockItem>) => Promise<void>;
+  addStockMovement: (m: Omit<StockMovement, 'id' | 'date'>) => Promise<void>;
+  addSupplier: (s: Omit<Supplier, 'id'>) => Promise<void>;
+  updateSupplier: (id: string, s: Partial<Supplier>) => Promise<void>;
+  addExpense: (e: Omit<Expense, 'id' | 'date'>) => Promise<void>;
+  updateExpense: (id: string, e: Partial<Expense>) => Promise<void>;
+  addWorker: (w: Omit<AppWorker, 'id'>) => Promise<void>;
+  updateWorker: (id: string, w: Partial<AppWorker>) => Promise<void>;
+  addAttendance: (a: Omit<Attendance, 'id'>) => Promise<void>;
+  addDocument: (d: Omit<AppDocument, 'id' | 'uploadedAt'>) => Promise<void>;
+  deleteDocument: (id: string) => Promise<void>;
   // Legacy
   addInvoice: (i: Omit<Invoice, 'id' | 'number' | 'status'>, installments?: Omit<Installment, 'id' | 'invoiceId' | 'status'>[]) => Promise<void>;
   updateInvoice: (id: string, i: Partial<Invoice>) => Promise<void>;
@@ -61,6 +85,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [professionalInvoices, setProfessionalInvoices] = useState<ProfessionalInvoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [workers, setWorkers] = useState<AppWorker[]>([]);
+  const [attendances, setAttendances] = useState<Attendance[]>([]);
+  const [documents, setDocuments] = useState<AppDocument[]>([]);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>({
     name: 'ProManager',
     address: 'Libreville, Gabon',
@@ -72,17 +103,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [dbError, setDbError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [users] = useState<User[]>([
-    { id: 'u1', name: 'Sophie (Secrétaire)', email: 'sophie@btp.com', role: 'SECRETARY' },
-    { id: 'u2', name: 'Marc (Ingénieur)', email: 'marc@btp.com', role: 'ENGINEER' },
-    { id: 'u3', name: 'Jean (Dir. Technique)', email: 'jean@btp.com', role: 'TECH_DIRECTOR' },
-    { id: 'u4', name: 'Admin', email: 'admin@btp.com', role: 'ADMIN' },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
 
   const fetchData = async () => {
     try {
       setIsLoading(true);
       const [
+        { data: profilesData, error: uErr },
         { data: clientsData, error: cErr },
         { data: projectsData, error: pErr },
         { data: lotsData, error: lErr },
@@ -92,8 +119,16 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         { data: quotesData, error: qErr },
         { data: profInvoicesData, error: piErr },
         { data: paymentsData, error: payErr },
-        { data: lineItemsData, error: liErr }
+        { data: lineItemsData, error: liErr },
+        { data: stockItemsData, error: siErr },
+        { data: stockMovementsData, error: smErr },
+        { data: suppliersData, error: sErr },
+        { data: expensesData, error: eErr },
+        { data: workersData, error: wErr },
+        { data: attendancesData, error: aErr },
+        { data: documentsData, error: dErr }
       ] = await Promise.all([
+        supabase.from('profiles').select('*'),
         supabase.from('clients').select('*'),
         supabase.from('projects').select('*'),
         supabase.from('lots').select('*'),
@@ -103,20 +138,38 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         supabase.from('quotes').select('*'),
         supabase.from('professional_invoices').select('*'),
         supabase.from('payments').select('*'),
-        supabase.from('line_items').select('*')
+        supabase.from('line_items').select('*'),
+        supabase.from('stock_items').select('*'),
+        supabase.from('stock_movements').select('*'),
+        supabase.from('suppliers').select('*'),
+        supabase.from('expenses').select('*'),
+        supabase.from('workers').select('*'),
+        supabase.from('attendance').select('*'),
+        supabase.from('documents').select('*')
       ]);
 
+      if (uErr) throw uErr;
       if (cErr) throw cErr;
-      if (pErr) throw pErr;
-      if (lErr) throw lErr;
-      if (tErr) throw tErr;
       
+      setUsers(profilesData?.map(u => ({
+        ...u,
+        role: u.role || 'ENGINEER' // Fallback role
+      })) || []);
       setClients(clientsData?.map(c => ({...c, isAccountClient: c.is_account_client})) || []);
       setProjects(projectsData?.map(p => ({...p, clientId: p.client_id, billingType: p.billing_type, createdAt: p.created_at})) || []);
       setLots(lotsData?.map(l => ({...l, projectId: l.project_id, engineerIds: l.engineer_ids})) || []);
       setTasks(tasksData?.map(t => ({...t, lotId: t.lot_id, engineerIds: t.engineer_ids, validatedByDT: t.validated_by_dt})) || []);
       setInvoices(invoicesData?.map(i => ({...i, clientId: i.client_id, projectId: i.project_id, totalAmount: i.total_amount, issueDate: i.issue_date, dueDate: i.due_date, isAccountClient: i.is_account_client, installmentsCount: i.installments_count})) || []);
       setInstallments(installmentsData?.map(inst => ({...inst, invoiceId: inst.invoice_id, dueDate: inst.due_date})) || []);
+
+      // New Management Data
+      setStockItems(stockItemsData?.map(si => ({...si, minQuantity: si.min_quantity, lastUpdated: si.last_updated})) || []);
+      setStockMovements(stockMovementsData?.map(sm => ({...sm, itemId: sm.item_id, projectId: sm.project_id, performedBy: sm.performed_by})) || []);
+      setSuppliers(suppliersData || []);
+      setExpenses(expensesData?.map(e => ({...e, projectId: e.project_id, supplierId: e.supplier_id, receiptUrl: e.receipt_url})) || []);
+      setWorkers(workersData?.map(w => ({...w, dailyRate: w.daily_rate})) || []);
+      setAttendances(attendancesData?.map(a => ({...a, workerId: a.worker_id, projectId: a.project_id, hoursWorked: a.hours_worked})) || []);
+      setDocuments(documentsData?.map(d => ({...d, projectId: d.project_id, uploadedAt: d.uploaded_at, uploadedBy: d.uploaded_by})) || []);
 
       // Professional Billing Data Mapping
       const mappedLineItems = lineItemsData?.map(li => ({
@@ -410,7 +463,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }));
       await supabase.from('line_items').insert(itemsToInsert);
     }
-    fetchData();
   };
 
   const updateQuote = async (id: string, q: Partial<Quote>, items?: LineItem[]) => {
@@ -436,13 +488,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }));
       await supabase.from('line_items').insert(itemsToInsert);
     }
-    fetchData();
   };
 
   const deleteQuote = async (id: string) => {
     await supabase.from('line_items').delete().eq('document_id', id);
     await supabase.from('quotes').delete().eq('id', id);
-    fetchData();
   };
 
   const addProfessionalInvoice = async (i: Omit<ProfessionalInvoice, 'id' | 'number' | 'amountPaid' | 'amountRemaining' | 'status'>, items: Omit<LineItem, 'id' | 'documentId'>[]) => {
@@ -478,7 +528,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }));
       await supabase.from('line_items').insert(itemsToInsert);
     }
-    fetchData();
   };
 
   const updateProfessionalInvoice = async (id: string, i: Partial<ProfessionalInvoice>, items?: LineItem[]) => {
@@ -501,14 +550,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }));
       await supabase.from('line_items').insert(itemsToInsert);
     }
-    fetchData();
   };
 
   const deleteProfessionalInvoice = async (id: string) => {
     await supabase.from('payments').delete().eq('invoice_id', id);
     await supabase.from('line_items').delete().eq('document_id', id);
     await supabase.from('professional_invoices').delete().eq('id', id);
-    fetchData();
   };
 
   const addPayment = async (p: Omit<Payment, 'id'>) => {
@@ -547,7 +594,6 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       };
       await supabase.from('alerts').insert([newAlert]);
     }
-    fetchData();
   };
 
   const convertQuoteToInvoice = async (quoteId: string) => {
@@ -569,10 +615,125 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     await updateQuote(quoteId, { status: 'ACCEPTED' });
   };
 
+  // --- New Management Implementations ---
+
+  const addStockItem = async (item: Omit<StockItem, 'id' | 'lastUpdated'>) => {
+    await supabase.from('stock_items').insert([{
+      name: item.name,
+      category: item.category,
+      unit: item.unit,
+      quantity: item.quantity,
+      min_quantity: item.minQuantity,
+      last_updated: new Date().toISOString()
+    }]);
+  };
+
+  const updateStockItem = async (id: string, item: Partial<StockItem>) => {
+    const updates: any = { ...item, last_updated: new Date().toISOString() };
+    if (item.minQuantity !== undefined) {
+      updates.min_quantity = item.minQuantity;
+      delete updates.minQuantity;
+    }
+    await supabase.from('stock_items').update(updates).eq('id', id);
+  };
+
+  const addStockMovement = async (m: Omit<StockMovement, 'id' | 'date'>) => {
+    await supabase.from('stock_movements').insert([{
+      item_id: m.itemId,
+      project_id: m.projectId,
+      type: m.type,
+      quantity: m.quantity,
+      date: new Date().toISOString(),
+      note: m.note,
+      performed_by: m.performedBy
+    }]);
+    
+    // Update stock quantity
+    const item = stockItems.find(i => i.id === m.itemId);
+    if (item) {
+      const newQty = m.type === 'IN' ? item.quantity + m.quantity : item.quantity - m.quantity;
+      await updateStockItem(m.itemId, { quantity: newQty });
+    }
+  };
+
+  const addSupplier = async (s: Omit<Supplier, 'id'>) => {
+    await supabase.from('suppliers').insert([s]);
+  };
+
+  const updateSupplier = async (id: string, s: Partial<Supplier>) => {
+    await supabase.from('suppliers').update(s).eq('id', id);
+  };
+
+  const addExpense = async (e: Omit<Expense, 'id' | 'date'>) => {
+    await supabase.from('expenses').insert([{
+      project_id: e.projectId,
+      supplier_id: e.supplierId,
+      description: e.description,
+      amount: e.amount,
+      date: new Date().toISOString(),
+      category: e.category,
+      status: e.status,
+      receipt_url: e.receiptUrl
+    }]);
+  };
+
+  const updateExpense = async (id: string, e: Partial<Expense>) => {
+    const updates: any = { ...e };
+    if (e.projectId !== undefined) { updates.project_id = e.projectId; delete updates.projectId; }
+    if (e.supplierId !== undefined) { updates.supplier_id = e.supplierId; delete updates.supplierId; }
+    if (e.receiptUrl !== undefined) { updates.receipt_url = e.receiptUrl; delete updates.receiptUrl; }
+    
+    await supabase.from('expenses').update(updates).eq('id', id);
+  };
+
+  const addWorker = async (w: Omit<AppWorker, 'id'>) => {
+    await supabase.from('workers').insert([{
+      name: w.name,
+      specialty: w.specialty,
+      phone: w.phone,
+      daily_rate: w.dailyRate,
+      status: w.status
+    }]);
+  };
+
+  const updateWorker = async (id: string, w: Partial<AppWorker>) => {
+    const updates: any = { ...w };
+    if (w.dailyRate !== undefined) { updates.daily_rate = w.dailyRate; delete updates.dailyRate; }
+    await supabase.from('workers').update(updates).eq('id', id);
+  };
+
+  const addAttendance = async (a: Omit<Attendance, 'id'>) => {
+    await supabase.from('attendance').insert([{
+      worker_id: a.workerId,
+      project_id: a.projectId,
+      date: a.date,
+      status: a.status,
+      hours_worked: a.hoursWorked
+    }]);
+  };
+
+  const addDocument = async (d: Omit<AppDocument, 'id' | 'uploadedAt'>) => {
+    await supabase.from('documents').insert([{
+      project_id: d.projectId,
+      name: d.name,
+      type: d.type,
+      url: d.url,
+      uploaded_at: new Date().toISOString(),
+      uploaded_by: d.uploadedBy,
+      description: d.description
+    }]);
+  };
+
+  const deleteDocument = async (id: string) => {
+    await supabase.from('documents').delete().eq('id', id);
+  };
+
   return (
     <DataContext.Provider value={{ 
       projects, clients, lots, tasks, alerts, users, invoices, installments, 
-      quotes, professionalInvoices, payments, companyInfo,
+      quotes, professionalInvoices, payments,
+      stockItems, stockMovements, suppliers, expenses, workers, attendances, documents,
+      companyInfo,
       dbError, isLoading, 
       addProject, updateProject, deleteProject, 
       addClient, updateClient, deleteClient, 
@@ -581,7 +742,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       closeLot, closeTask, markAlertRead, 
       addInvoice, updateInvoice, deleteInvoice, updateInstallment,
       addQuote, updateQuote, deleteQuote, convertQuoteToInvoice,
-      addProfessionalInvoice, updateProfessionalInvoice, deleteProfessionalInvoice, addPayment
+      addProfessionalInvoice, updateProfessionalInvoice, deleteProfessionalInvoice, addPayment,
+      addStockItem, updateStockItem, addStockMovement,
+      addSupplier, updateSupplier, addExpense, updateExpense,
+      addWorker, updateWorker, addAttendance, addDocument, deleteDocument
     }}>
       {children}
     </DataContext.Provider>

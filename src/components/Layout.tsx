@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { LayoutDashboard, Briefcase, Users, Bell, LogOut, HardHat, DatabaseZap, User, Sparkles, Receipt, Menu, X, Mail, Phone } from 'lucide-react';
+import { 
+  LayoutDashboard, Briefcase, Users, Bell, LogOut, HardHat, DatabaseZap, 
+  User, Sparkles, Receipt, Menu, X, Mail, Phone, Clock, CreditCard, FileText, Globe 
+} from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import Auth from './Auth';
@@ -33,6 +36,12 @@ export default function Layout() {
     { name: 'Tableau de bord', path: '/', icon: LayoutDashboard, hidden: !user },
     { name: 'Architecte IA', path: '/ai-architect', icon: Sparkles },
     { name: 'Projets', path: '/projects', icon: Briefcase, hidden: !user },
+    { name: 'Planning', path: '/planning', icon: Clock, hidden: !user },
+    { name: 'Stocks', path: '/inventory', icon: DatabaseZap, hidden: !user },
+    { name: 'Dépenses', path: '/expenses', icon: CreditCard, hidden: !user },
+    { name: 'RH & Pointage', path: '/hr', icon: Users, hidden: !user },
+    { name: 'Documents', path: '/documents', icon: FileText, hidden: !user },
+    { name: 'Portail Client', path: '/client-portal', icon: Globe, hidden: !user },
     { name: 'Clients', path: '/clients', icon: Users, hidden: !user },
     { name: 'Facturation', path: '/billing', icon: Receipt, hidden: !user },
     { name: 'Alertes', path: '/alerts', icon: Bell, badge: unreadAlerts, hidden: !user },

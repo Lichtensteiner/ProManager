@@ -162,3 +162,87 @@ export interface Alert {
   date: string;
   read: boolean;
 }
+
+// --- New Management Types ---
+
+// 1. Inventory & Equipment
+export type StockMovementType = 'IN' | 'OUT' | 'ADJUSTMENT';
+
+export interface StockItem {
+  id: string;
+  name: string;
+  category: string;
+  unit: string; // kg, m3, sac, etc.
+  quantity: number;
+  minQuantity: number;
+  lastUpdated: string;
+}
+
+export interface StockMovement {
+  id: string;
+  itemId: string;
+  projectId?: string;
+  type: StockMovementType;
+  quantity: number;
+  date: string;
+  note?: string;
+  performedBy: string;
+}
+
+// 2. Expenses & Suppliers
+export interface Supplier {
+  id: string;
+  name: string;
+  category: string;
+  contact: string;
+  phone: string;
+  email?: string;
+  address?: string;
+}
+
+export interface Expense {
+  id: string;
+  projectId?: string;
+  supplierId?: string;
+  description: string;
+  amount: number;
+  date: string;
+  category: 'MATERIAL' | 'LABOR' | 'EQUIPMENT' | 'OTHER';
+  status: 'PENDING' | 'PAID';
+  receiptUrl?: string;
+}
+
+// 3. HR & Attendance
+export interface AppWorker {
+  id: string;
+  name: string;
+  specialty: string;
+  phone: string;
+  dailyRate: number;
+  status: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface Attendance {
+  id: string;
+  workerId: string;
+  projectId: string;
+  date: string;
+  status: 'PRESENT' | 'ABSENT' | 'LATE';
+  hoursWorked: number;
+}
+
+// 4. Documents
+export interface AppDocument {
+  id: string;
+  projectId: string;
+  name: string;
+  type: 'PLAN' | 'PHOTO' | 'CONTRACT' | 'REPORT' | 'OTHER';
+  url: string;
+  uploadedAt: string;
+  uploadedBy: string;
+  description?: string;
+}
+
+// 5. Planning (Extended Task)
+// We'll use the existing Task interface but add dates if needed
+// Or create a specific PlanningTask if it's separate from technical tasks
