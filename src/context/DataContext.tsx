@@ -111,7 +111,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       if (lErr) throw lErr;
       if (tErr) throw tErr;
       
-      setClients(clientsData || []);
+      setClients(clientsData?.map(c => ({...c, isAccountClient: c.is_account_client})) || []);
       setProjects(projectsData?.map(p => ({...p, clientId: p.client_id, billingType: p.billing_type, createdAt: p.created_at})) || []);
       setLots(lotsData?.map(l => ({...l, projectId: l.project_id, engineerIds: l.engineer_ids})) || []);
       setTasks(tasksData?.map(t => ({...t, lotId: t.lot_id, engineerIds: t.engineer_ids, validatedByDT: t.validated_by_dt})) || []);
@@ -248,7 +248,13 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addClient = async (c: Omit<Client, 'id'>) => {
-    await supabase.from('clients').insert([c]);
+    await supabase.from('clients').insert([{
+      name: c.name,
+      contact: c.contact,
+      email: c.email,
+      address: c.address,
+      is_account_client: c.isAccountClient
+    }]);
   };
 
   const updateClient = async (id: string, c: Partial<Client>) => {
@@ -256,6 +262,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     if (c.name !== undefined) updates.name = c.name;
     if (c.contact !== undefined) updates.contact = c.contact;
     if (c.email !== undefined) updates.email = c.email;
+    if (c.address !== undefined) updates.address = c.address;
+    if (c.isAccountClient !== undefined) updates.is_account_client = c.isAccountClient;
 
     await supabase.from('clients').update(updates).eq('id', id);
   };
