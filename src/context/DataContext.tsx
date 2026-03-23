@@ -62,11 +62,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [professionalInvoices, setProfessionalInvoices] = useState<ProfessionalInvoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>({
-    name: 'BTP ProManager',
-    address: '123 Avenue des Travaux, 75001 Paris',
-    email: 'contact@btppromanager.com',
-    phone: '+33 1 23 45 67 89',
-    taxId: 'FR 12 345 678 901'
+    name: 'ProManager',
+    address: 'Libreville, Gabon',
+    email: 'ludo.consulting3@gmail.com',
+    phone: '062641120',
+    taxId: 'Ludo_consulting'
   });
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [dbError, setDbError] = useState<string | null>(null);
@@ -119,6 +119,18 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       setInstallments(installmentsData?.map(inst => ({...inst, invoiceId: inst.invoice_id, dueDate: inst.due_date})) || []);
 
       // Professional Billing Data Mapping
+      const mappedLineItems = lineItemsData?.map(li => ({
+        ...li,
+        documentId: li.document_id,
+        unitPrice: li.unit_price,
+        taxRate: li.tax_rate
+      })) || [];
+
+      const mappedPayments = paymentsData?.map(pay => ({
+        ...pay,
+        invoiceId: pay.invoice_id
+      })) || [];
+
       const mappedQuotes = quotesData?.map(q => ({
         ...q,
         clientId: q.client_id,
@@ -127,7 +139,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         expiryDate: q.expiry_date,
         taxTotal: q.tax_total,
         totalAmount: q.total_amount,
-        lineItems: lineItemsData?.filter(li => li.document_id === q.id) || []
+        lineItems: mappedLineItems.filter(li => li.documentId === q.id)
       })) || [];
       setQuotes(mappedQuotes);
 
@@ -142,11 +154,11 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         totalAmount: pi.total_amount,
         amountPaid: pi.amount_paid,
         amountRemaining: pi.amount_remaining,
-        lineItems: lineItemsData?.filter(li => li.document_id === pi.id) || [],
-        payments: paymentsData?.filter(pay => pay.invoice_id === pi.id) || []
+        lineItems: mappedLineItems.filter(li => li.documentId === pi.id),
+        payments: mappedPayments.filter(pay => pay.invoiceId === pi.id)
       })) || [];
       setProfessionalInvoices(mappedProfInvoices);
-      setPayments(paymentsData?.map(pay => ({...pay, invoiceId: pay.invoice_id})) || []);
+      setPayments(mappedPayments);
       setDbError(null);
     } catch (error: any) {
       console.error("Supabase fetch error:", error);

@@ -15,7 +15,7 @@ import {
 import { cn } from '../lib/utils';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 export default function Billing() {
   const { 
@@ -74,60 +74,128 @@ export default function Billing() {
     XLSX.writeFile(wb, `${activeTab.toLowerCase()}_export_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
-  const exportToPDF = (doc: Quote | ProfessionalInvoice) => {
+  const exportToPDF = (doc: Quote | ProfessionalInvoice, isPrint = false) => {
     const docPdf = new jsPDF();
     const client = clients.find(c => c.id === doc.clientId);
+    const project = projects.find(p => p.id === doc.projectId);
     
-    // Header
-    docPdf.setFontSize(20);
-    docPdf.text(companyInfo.name, 14, 22);
-    docPdf.setFontSize(10);
-    docPdf.text(companyInfo.address, 14, 30);
-    docPdf.text(`Email: ${companyInfo.email} | Tél: ${companyInfo.phone}`, 14, 35);
+    // Header - Company Info
+    docPdf.setFillColor(248, 250, 252); // slate-50
+    docPdf.rect(0, 0, 210, 40, 'F');
     
-    // Title
-    docPdf.setFontSize(16);
+    docPdf.setTextColor(15, 23, 42); // slate-900
+    docPdf.setFontSize(24);
+    docPdf.setFont('helvetica', 'bold');
+    docPdf.text(companyInfo.name, 14, 25);
+    
+    docPdf.setFontSize(9);
+    docPdf.setFont('helvetica', 'normal');
+    docPdf.setTextColor(100, 116, 139); // slate-500
+    docPdf.text(companyInfo.address, 14, 32);
+    docPdf.text(`Email: ${companyInfo.email} | Tél: ${companyInfo.phone} | ID: ${companyInfo.taxId}`, 14, 37);
+    
+    // Document Title & Info
+    docPdf.setTextColor(15, 23, 42);
+    docPdf.setFontSize(18);
+    docPdf.setFont('helvetica', 'bold');
     const title = activeTab === 'INVOICES' ? 'FACTURE' : 'DEVIS';
-    docPdf.text(`${title} N° ${doc.number}`, 14, 50);
+    docPdf.text(`${title} N° ${doc.number}`, 14, 55);
     
-    // Client Info
-    docPdf.setFontSize(12);
-    docPdf.text('Client:', 14, 65);
+    // Horizontal Line
+    docPdf.setDrawColor(226, 232, 240); // slate-200
+    docPdf.line(14, 60, 196, 60);
+    
+    // Client & Project Info
+    docPdf.setFontSize(11);
+    docPdf.setFont('helvetica', 'bold');
+    docPdf.text('DESTINATAIRE', 14, 72);
+    
+    docPdf.setFont('helvetica', 'normal');
     docPdf.setFontSize(10);
-    docPdf.text(client?.name || 'Inconnu', 14, 70);
-    docPdf.text(client?.address || '', 14, 75);
+    docPdf.text(client?.name || 'Inconnu', 14, 78);
+    docPdf.text(client?.address || '', 14, 83);
+    if (client?.phone) docPdf.text(`Tél: ${client.phone}`, 14, 88);
     
-    // Dates
-    docPdf.text(`Date d'émission: ${format(new Date(doc.issueDate), 'dd/MM/yyyy')}`, 140, 65);
-    if ('dueDate' in doc) {
-      docPdf.text(`Date d'échéance: ${format(new Date(doc.dueDate), 'dd/MM/yyyy')}`, 140, 70);
-    } else if ('expiryDate' in doc) {
-      docPdf.text(`Date d'expiration: ${format(new Date(doc.expiryDate), 'dd/MM/yyyy')}`, 140, 70);
+    // Project Info
+    if (project) {
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.text('PROJET', 80, 72);
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.text(project.name, 80, 78);
+      docPdf.text(`Localisation: ${project.location}`, 80, 83);
     }
+    
+    // Document Dates
+    docPdf.setFont('helvetica', 'bold');
+    docPdf.text('DÉTAILS', 140, 72);
+    docPdf.setFont('helvetica', 'normal');
+    docPdf.text(`Date d'émission: ${format(new Date(doc.issueDate), 'dd/MM/yyyy')}`, 140, 78);
+    if ('dueDate' in doc) {
+      docPdf.text(`Date d'échéance: ${format(new Date(doc.dueDate), 'dd/MM/yyyy')}`, 140, 83);
+    } else if ('expiryDate' in doc) {
+      docPdf.text(`Date d'expiration: ${format(new Date(doc.expiryDate), 'dd/MM/yyyy')}`, 140, 83);
+    }
+    docPdf.text(`Statut: ${doc.status}`, 140, 88);
 
     // Table
     const tableData = (doc.lineItems || []).map(item => [
       item.description,
       item.quantity,
-      `${item.unitPrice.toLocaleString()} FCFA`,
-      `${item.taxRate}%`,
-      `${(item.quantity * item.unitPrice * (1 + item.taxRate / 100)).toLocaleString()} FCFA`
+      `${(item.unitPrice || 0).toLocaleString()} FCFA`,
+      `${item.taxRate || 0}%`,
+      `${(item.quantity * (item.unitPrice || 0) * (1 + (item.taxRate || 0) / 100)).toLocaleString()} FCFA`
     ]);
 
-    (docPdf as any).autoTable({
-      startY: 85,
+    autoTable(docPdf, {
+      startY: 100,
       head: [['Description', 'Qté', 'Prix Unitaire', 'TVA', 'Total']],
       body: tableData,
+      headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: 14, right: 14 },
     });
 
     // Totals
-    const finalY = (docPdf as any).lastAutoTable.finalY + 10;
-    docPdf.text(`Sous-total: ${doc.subtotal.toLocaleString()} FCFA`, 140, finalY);
-    docPdf.text(`TVA: ${doc.taxTotal.toLocaleString()} FCFA`, 140, finalY + 5);
-    docPdf.setFontSize(12);
-    docPdf.text(`TOTAL TTC: ${doc.totalAmount.toLocaleString()} FCFA`, 140, finalY + 12);
+    const finalY = (docPdf as any).lastAutoTable.finalY + 15;
+    
+    docPdf.setFontSize(10);
+    docPdf.setTextColor(100, 116, 139);
+    docPdf.text('Notes & Conditions:', 14, finalY);
+    docPdf.setFontSize(9);
+    docPdf.text(doc.notes || 'Aucune note particulière.', 14, finalY + 6, { maxWidth: 100 });
 
-    docPdf.save(`${doc.number}.pdf`);
+    docPdf.setTextColor(15, 23, 42);
+    docPdf.setFontSize(10);
+    docPdf.text(`Sous-total:`, 140, finalY);
+    docPdf.text(`${(doc.subtotal || 0).toLocaleString()} FCFA`, 196, finalY, { align: 'right' });
+    
+    docPdf.text(`TVA:`, 140, finalY + 7);
+    docPdf.text(`${(doc.taxTotal || 0).toLocaleString()} FCFA`, 196, finalY + 7, { align: 'right' });
+    
+    docPdf.setFillColor(37, 99, 235);
+    docPdf.rect(135, finalY + 12, 65, 12, 'F');
+    docPdf.setTextColor(255, 255, 255);
+    docPdf.setFontSize(12);
+    docPdf.setFont('helvetica', 'bold');
+    docPdf.text(`TOTAL TTC:`, 140, finalY + 20);
+    docPdf.text(`${(doc.totalAmount || 0).toLocaleString()} FCFA`, 196, finalY + 20, { align: 'right' });
+
+    // Footer
+    const pageCount = (docPdf as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      docPdf.setPage(i);
+      docPdf.setFontSize(8);
+      docPdf.setTextColor(148, 163, 184);
+      docPdf.text(`Page ${i} sur ${pageCount}`, 105, 285, { align: 'center' });
+      docPdf.text(`${companyInfo.name} - ${companyInfo.address} - Tél: ${companyInfo.phone}`, 105, 290, { align: 'center' });
+    }
+
+    if (isPrint) {
+      docPdf.autoPrint();
+      window.open(docPdf.output('bloburl'), '_blank');
+    } else {
+      docPdf.save(`${doc.number}.pdf`);
+    }
   };
 
   return (
@@ -307,9 +375,16 @@ export default function Billing() {
                         <button 
                           onClick={() => exportToPDF(doc)}
                           className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                          title="Exporter PDF"
+                          title="Télécharger PDF"
                         >
                           <FileDown className="w-5 h-5" />
+                        </button>
+                        <button 
+                          onClick={() => exportToPDF(doc, true)}
+                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          title="Imprimer"
+                        >
+                          <Printer className="w-5 h-5" />
                         </button>
                         {activeTab === 'QUOTES' && doc.status === 'SENT' && (
                           <button 
