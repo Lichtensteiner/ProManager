@@ -1,0 +1,5 @@
+{
+  "name": "BTP ProManager",
+  "description": "Outil d'aide à la décision et de gestion de projet pour le BTP avec gestion des rôles et système d'alertes.",
+  "requestFramePermissions": []
+}
